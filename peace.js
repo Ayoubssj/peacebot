@@ -19,6 +19,8 @@ var player;
 var nbr_joueurs;
 var joueurs;
 var pari;
+var assurance;
+var choixassurance;
 var distribution;
 var cartes = ["./cartes/Ac.gif","./cartes/Ad.gif","./cartes/Ah.gif","./cartes/As.gif",
 "./cartes/2c.gif","./cartes/2d.gif","./cartes/2h.gif","./cartes/2s.gif",
@@ -106,7 +108,12 @@ function Total(tableau){
     if (total > 21){
       return false
     }else{
-      return total
+      if(total==21){
+        return "BlackJack"
+      }else{
+        return total
+      }
+      
     }
   }else{
     for(verif=0; verif < total.length; verif++){
@@ -119,7 +126,12 @@ function Total(tableau){
   if (total.length == 0){
     return false
   }else{
-    return cleanArray(total)
+    if(Math.max(...total) == 21){
+      return "BlackJack"
+    }else{
+      return cleanArray(total)
+    }
+    
   }
 }
 
@@ -152,8 +164,6 @@ function addition(var1,var2){
 client.on("message", async(message) => {
 
 
-  var msgauthor = message.author.id
-  
   if(message.content.startsWith("!ramadan")){
 
     var ville = message.content.slice(9)
@@ -174,6 +184,14 @@ client.on("message", async(message) => {
       message.channel.send(`Le Maghreb est déjà passé\nSi c'était un bon bot là ça devrait sortir les horaires de dedmain mais vas-y flemme frérot aujourd'hui c'était ${maghreb} demain ça sera presque pareil va manger ou faire tarawih au lieu de rester sur discord`)
     }
   }
+
+
+
+
+
+
+
+  var msgauthor = message.author.id
  
   if(message.author.bot)return;
 
@@ -243,6 +261,7 @@ client.on("message", async(message) => {
     }
 
     if ((message.content.startsWith("La partie peut commencer") || message.content.startsWith("Le prochain tour peut commencer") || message.content.includes("Vous avez misé")) & message.author.username == "Tatsumaki"){
+      assurance = false;
       if(player < nbr_joueurs){
         pari = true
         if(player == 0){
@@ -269,6 +288,9 @@ client.on("message", async(message) => {
             argent[player] = argent[player] - Number(message.content.slice(4));
             player = player + 1;
             await message.channel.send(`<@${joueurs[player-1]}> Vous avez misé ${argent[nbr_joueurs+player-1]}€`);
+            if(player != nbr_joueurs){
+              await message.channel.send(`<@${joueurs[player]}> A votre tour de miser`);
+            }
             
           }
         }else{
@@ -277,20 +299,46 @@ client.on("message", async(message) => {
       }
     }
 
+    if(message.content.startsWith("assurance") & assurance == true & choixassurance == true){
+      if (message.author.id == joueurs[player]){
+        if(message.content == "assurance yes" || message.content == "assurance no"){
+          if(message.content == "assurance yes"){
+            if (argent[player] >= argent[player+nbr_joueurs]/2){
+              argent[player+nbr_joueurs] = [argent[player+nbr_joueurs],argent[player+nbr_joueurs]/2]
+              player = player + 1
+              if(player != nbr_joueurs){
+                await message.channel.send(`${joueurs[player]} A votre tour de choisir si vous prenez une assurance ou non`)
+              }else{
+                await message.channel.send("Distribution des cartes des joueurs");
+                choixassurance = false
+              }
+            }else{
+              await message.channel.send(`${joueurs[player]} Vous n'avez pas assez d'argent vous ne pouvez donc pas prendre d'assurance`);
+              argent[player+nbr_joueurs] = [argent[player+nbr_joueurs],0];
+              player = player + 1
+              if(player != nbr_joueurs){
+                await message.channel.send(`${joueurs[player]} A votre tour de choisir si vous prenez une assurance ou non`)
+              }else{
+                await message.channel.send("Distribution des cartes des joueurs");
+                choixassurance = false
+              }
+            }
+          }else{
+            argent[player+nbr_joueurs] = [argent[player+nbr_joueurs],0];
+            player = player + 1
+            if(player != nbr_joueurs){
+              await message.channel.send(`${joueurs[player]} A votre tour de choisir si vous prenez une assurance ou non`)
+            }else{
+              await message.channel.send("Distribution des cartes des joueurs");
+              choixassurance = false
+            }
+          }
+        }else{
+          await message.channel.send("Veuillez entrer soit '**assurance yes**' soit '**assurance no**'")
+        }
+      }
+    }
 
-    // if (cartes.length == 416 & debut == true){
-    //   await message.channel.send("Brulage de 5 cartes")
-    //   for(var brul = 0; brul<5; brul++){
-    //     let a = getRandomInt(cartes.length);
-    //     if(brul !=4 ){
-    //       await message.channel.send({files: [cartes[a]]});
-    //       cartes.splice(a,1);
-    //     }else{
-    //      await message.channel.send("Terminé",{files: [cartes[a]]});
-    //      cartes.splice(a,1);
-    //     }
-    //   }
-    // }
 
     if (message.content.startsWith("Le croupier commence par se distribuer à lui même deux cartes (dont une face cachée)") & message.author.username == "Tatsumaki"){
        cartescroupier = []
@@ -304,6 +352,8 @@ client.on("message", async(message) => {
             cartes.splice(a,1);
             if(cartescroupier[0] == 1.1){
               await message.channel.send(`Total du croupier: **1 OU 11**`,{files: ["./cartes/carteface.jpg"]});
+              assurance = true;
+              choixassurance = true
             }else{
               await message.channel.send(`Total du croupier: **${cartescroupier[0]}**`,{files: ["./cartes/carteface.jpg"]});
             }
@@ -314,32 +364,44 @@ client.on("message", async(message) => {
             await message.channel.send({files: [cartes[a]]});
             cartes.splice(a,1);
           }
-        }
-      for(var j=0 ; j < nbr_joueurs; j++){
-        player = 0;
-        cartesjoueur = [];
-        a = getRandomInt(cartes.length);
-        b = getRandomInt(cartes.length);
-        while (b==a){
-          b = getRandomInt(cartes.length);
-        }
-        carte1 = cartes[a].slice(9,10);
-        carte2 = cartes[b].slice(9,10);
-        cartesjoueur = [valeur(carte1),valeur(carte2)];
-        total = Total(cartesjoueur);
-        await message.channel.send(`<@${joueurs[j]}> Total: **${total}**`,{files: [cartes[a],cartes[b]]});
-        joueurs.push(total);
-        if(a>b){
-          cartes.splice(a,1);
-          cartes.splice(b,1);
-        }else{
-          cartes.splice(b,1);
-          cartes.splice(a,1);
-        }
       }
-      await message.channel.send(`<@${joueurs[0]}> c'est à votre tour qu'allez vous faire?\nPour tirer une nouvelle carte tapez 'hit'\nPour rester sur votre main tapez 'stand'`);
-      distribution = true;
+      if(assurance){
+        await message.channel.send("Le croupier a tiré un as souhaitez vous prendre une assurance pour vous prémunir si le croupier a un blackjack?");
+        await message.channel.send({embed: {fields: [{name: "Comment prendre une assurance?", value: "Le croupier a eu blackjack prendre une assurance revient à parier la moitié de sa mise\nSi le croupier a un blackjack vous gagner le double de votre assurance sinon vous perdez votre assurance\nPour choisir de prendre ou non une assurance écrivez\n**assurance yes** ou **assurance no**"}]}})
+        player = 0;
+        await message.channel.send(`${joueurs[player]} Choisissez si vous prenez une assurance ou non`)
+      }else{
+        await message.channel.send("Distribution des cartes des joueurs");
+      }
     }
+
+  if(message.content.startsWith("Distribution des cartes des joueurs")){
+    for(var j=0 ; j < nbr_joueurs; j++){
+      player = 0;
+      cartesjoueur = [];
+      a = getRandomInt(cartes.length);
+      b = getRandomInt(cartes.length);
+      while (b==a){
+        b = getRandomInt(cartes.length);
+      }
+      carte1 = cartes[a].slice(9,10);
+      carte2 = cartes[b].slice(9,10);
+      cartesjoueur = [valeur(carte1),valeur(carte2)];
+      total = Total(cartesjoueur);
+      await message.channel.send(`<@${joueurs[j]}> Total: **${total}**`,{files: [cartes[a],cartes[b]]});
+      joueurs.push(total);
+      if(a>b){
+        cartes.splice(a,1);
+        cartes.splice(b,1);
+      }else{
+        cartes.splice(b,1);
+        cartes.splice(a,1);
+      }
+    }
+    await message.channel.send(`<@${joueurs[0]}> c'est à votre tour qu'allez vous faire?\nPour tirer une nouvelle carte tapez 'hit'\nPour rester sur votre main tapez 'stand'`);
+    distribution = true;
+  }
+
     if(message.content.startsWith("hit")){
       if (message.author.id == joueurs[player]){
         a = getRandomInt(cartes.length);
@@ -378,56 +440,79 @@ client.on("message", async(message) => {
 
     if(message.content.startsWith("Au tour du croupier") & message.author.username == "Tatsumaki"){
       cartescroupier = Total(cartescroupier)
-      cartescroupier = tableau(cartescroupier)
-      await message.channel.send(`Retournement de carte face cachée\nTotal: ${cartescroupier}`,{files: [facecaché]})
-
-      while(Math.max(...cartescroupier) < 17 & cartescroupier[0] != false){
-        a = getRandomInt(cartes.length);
-        carte = valeur(cartes[a].slice(9,10)); 
-        cartescroupier = addition(cartescroupier,carte);
+      if(cartescroupier == "BlackJack"){
+        await message.channel.send(`Retournement de carte face cachée\nTotal: ${cartescroupier}`,{files: [facecaché]});
+        await message.channel.send("**Le croupier a eu un BlackJack!!**")
+        await message.channel.send("Le croupier a fini de joueur\nVoici les résultats:")
+      }else{
         cartescroupier = tableau(cartescroupier)
-        await message.channel.send(`Total croupier: ${cartescroupier}`,{files: [cartes[a]]});
+        await message.channel.send(`Retournement de carte face cachée\nTotal: ${cartescroupier}`,{files: [facecaché]})
+
+        while(Math.max(...cartescroupier) < 17 & cartescroupier[0] !== false){
+          a = getRandomInt(cartes.length);
+          carte = valeur(cartes[a].slice(9,10)); 
+          cartescroupier = addition(cartescroupier,carte);
+          cartescroupier = tableau(cartescroupier)
+          await message.channel.send(`Total croupier: ${cartescroupier}`,{files: [cartes[a]]});
+        }
+        await message.channel.send("Le croupier a fini de joueur\nVoici les résultats:")
       }
-      await message.channel.send("Le croupier a fini de joueur\nVoici les résultats:")
+      
     }
 
     if(message.content.startsWith("Le croupier a fini de joueur") & message.author.username == "Tatsumaki"){
-      
-      if(cartescroupier[0] == false){
-        await message.channel.send("Le croupier a perdu tout les joueurs encore en lice ont gagnés")
-        for(var ki = 0; ki < nbr_joueurs; ki++){
-          if(joueurs[nbr_joueurs] == false){
-            await message.channel.send(`<@${joueurs[ki]}> Vous avez perdu`);
-            joueurs.splice(nbr_joueurs,1);
-          }else{
-            await message.channel.send(`<@${joueurs[ki]}> Vous avez gagné`);
-          joueurs.splice(nbr_joueurs,1);
+      if(assurance == true){
+        if(cartescroupier == "BlackJack"){
+          for(var i=0; i<nbr_joueurs;i++){
+            if(joueurs[nbr_joueurs] == false){
+              await message.channel.send(`<@${joueurs[ki]}> Vous avez perdu votre mise de ${argent[nbr_joueurs][0]}\nVous avez gagné votre assu`);
+              joueurs.splice(nbr_joueurs,1);
+            }else{
+              await message.channel.send(`<@${joueurs[ki]}> Vous avez gagné`);
+              joueurs.splice(nbr_joueurs,1);
+            }
           }
+        }else{
+
         }
       }else{
-        for(var gagnants = 0 ; gagnants < nbr_joueurs; gagnants++){
-          joueurs[nbr_joueurs] = tableau(joueurs[nbr_joueurs])
-          if(Math.max(...joueurs[nbr_joueurs]) > Math.max(...cartescroupier)){
-            await message.channel.send(`<@${joueurs[gagnants]}> Vous avez gagné ${2*argent[nbr_joueurs]}€`);
-            joueurs.splice(nbr_joueurs,1);
-            argent[gagnants] = argent[gagnants] + 2*argent[nbr_joueurs];
-            argent.splice(nbr_joueurs,1);
-          }else{
-            if(Math.max(...joueurs[nbr_joueurs]) == Math.max(...cartescroupier)){
-              await message.channel.send(`<@${joueurs[gagnants]}> Egalité avec le croupier, Vous reprenez votre mise de ${argent[nbr_joueurs]}€`);
+        if(cartescroupier[0] == false){
+          await message.channel.send("Le croupier a perdu tout les joueurs encore en lice ont gagnés")
+          for(var ki = 0; ki < nbr_joueurs; ki++){
+            if(joueurs[nbr_joueurs] == false){
+              await message.channel.send(`<@${joueurs[ki]}> Vous avez perdu`);
               joueurs.splice(nbr_joueurs,1);
-              argent[gagnants] = argent[gagnants] + argent[nbr_joueurs];
+            }else{
+              await message.channel.send(`<@${joueurs[ki]}> Vous avez gagné`);
+              joueurs.splice(nbr_joueurs,1);
+            }
+          }
+        }else{
+          for(var gagnants = 0 ; gagnants < nbr_joueurs; gagnants++){
+            joueurs[nbr_joueurs] = tableau(joueurs[nbr_joueurs])
+            if(Math.max(...joueurs[nbr_joueurs]) > Math.max(...cartescroupier)){
+              await message.channel.send(`<@${joueurs[gagnants]}> Vous avez gagné ${2*argent[nbr_joueurs]}€`);
+              joueurs.splice(nbr_joueurs,1);
+              argent[gagnants] = argent[gagnants] + 2*argent[nbr_joueurs];
               argent.splice(nbr_joueurs,1);
             }else{
-              await message.channel.send(`<@${joueurs[gagnants]}> Vous avez perdu ${argent[nbr_joueurs]}€`);
-              joueurs.splice(nbr_joueurs,1);
-              argent.splice(nbr_joueurs,1);
+              if(Math.max(...joueurs[nbr_joueurs]) == Math.max(...cartescroupier)){
+                await message.channel.send(`<@${joueurs[gagnants]}> Egalité avec le croupier, Vous reprenez votre mise de ${argent[nbr_joueurs]}€`);
+                joueurs.splice(nbr_joueurs,1);
+                argent[gagnants] = argent[gagnants] + argent[nbr_joueurs];
+                argent.splice(nbr_joueurs,1);
+              }else{
+                await message.channel.send(`<@${joueurs[gagnants]}> Vous avez perdu ${argent[nbr_joueurs]}€`);
+                joueurs.splice(nbr_joueurs,1);
+                argent.splice(nbr_joueurs,1);
+              }
             }
           }
         }
+        player = 0
+        await message.channel.send("Le prochain tour peut commencer")
       }
-      player = 0
-      await message.channel.send("Le prochain tour peut commencer")
+      
     }
 
 });
