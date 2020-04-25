@@ -1,1 +1,1 @@
-worker : node paix.js
+worker : node peace.js
